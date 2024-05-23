@@ -42,6 +42,7 @@ class tank(cylinder):
 
 class cone:
     I = None
+    CG = None
     def __init__(self, mass: float, diameter: float, height: float):
         """return a new cone object
 
@@ -54,6 +55,7 @@ class cone:
         self.diameter = diameter
         self.height = height
         self.calc_I()
+        self.calc_CG()
         
     def calc_I(self):
         Iz = 3/10 * self.mass * (self.diameter/2)**2
@@ -64,6 +66,8 @@ class cone:
         self.CG = np.array([0, 0, self.height/4])        
         
 class fin:
+    CG = None
+    I = None
     def __init__(self, mass: float, height: float, mean_chord: float, taper: float):
         """return a new fin object
 
@@ -80,6 +84,11 @@ class fin:
         self.calc_I()
         self.calc_CG()
 
+    def calc_I(self):
+        pass
+    def calc_CG(self):
+        pass
+    
 class engine(cylinder):
     def __init__(self, mass: float, diameter: float, height: float, max_thrust: float):
         """return a new engine object
@@ -105,8 +114,22 @@ class struct_rocket:
 
     I = np.array([0, 0, 0])
     
-    def __init__(self):
-        pass
+    def __init__(self, n_fins: int, *parts):
+        """retunr a new struct_rocket object
+
+            the origin of the rocket is at the bottom of the cylinder in the center of the base and with the positive z axis pointing up
+
+        Args:
+            n_fin (int): number of fins
+            **parts: dict of rocket parts, must be in order from bottom to top
+             exaple: struct_rocket(engine, cylinder, fin, tank, cone)
+        """
+        self.n_fins = n_fins
+        self.parts = parts
+        self.tank_pos_rel = np.array([0, 0, self.parts[3].height/2])  # distance between the tank CG and the bottom of the cylinder
+        self.fin_pos_rel_cylinder = np.array([0, 0, 0])  # distance between the fin CG and the bottom of the cylinder
+        self.cone_pos_rel_cylinder = np.array([0, 0, 0]) # distance between the cone CG and the bottom of the cylinder
+        self.calc_I()
     def get_dry_mass(self):
         pass
     def get_wet_mass(self):
@@ -116,5 +139,19 @@ class struct_rocket:
     def get_Ct(self):
         pass
     def calc_I(self):
-        pass
+        pass    
+            
+
+if __name__ == "__main__":
+    c1 = cylinder(3, 1, 3)
+    c2 = cone(2/3, 1, 2)
+    t1 = tank(1, 1, 2, 1)
+    e1 = engine(0.8, 1, 0.5, 100)
+    f1 = fin(0.2, 1, 1, 0.5)
     
+    print(c1.CG)
+    print(c2.CG)
+    print(t1.CG)
+    print(e1.CG)
+    print(f1.CG)
+    rocket = struct_rocket(3, e1, c1, f1, t1, c2)
