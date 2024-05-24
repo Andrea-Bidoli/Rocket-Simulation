@@ -1,17 +1,27 @@
 import numpy as np
+from copy import deepcopy
 
 R_matrix = lambda theta: np.array([[np.cos(theta), -np.sin(theta), 1], [np.sin(theta), np.cos(theta), 1]])
 
 class part:
     versori = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     children = {}
-    def __init__(self, diameter: float, height: float):
+    
+    def __init__(self, diameter: float, height: float, mass: float):
         self.diameter = diameter
         self.height = height
-
+        self.mass = mass
+        self.CG = np.array([0, 0, height/2])
+        
     def add_child(self, child, offset):
         self.children[child] = offset
+        self.calc_child_CG()
 
+    def calc_child_CG(self):
+        for cpart in self.children:
+            self.CG = (self.CG*self.mass + (cpart.CG+self.children[cpart])*cpart.mass)/ (self.mass + cpart.mass)
+            self.mass += cpart.mass
+        
 class cylinder(part):
     I = None
     def __init__(self, mass: float, diameter:float, height:float):
@@ -22,7 +32,7 @@ class cylinder(part):
             diameter (float): diameter of the cylinder
             height (float): height of the cylinder
         """
-        super().__init__(diameter, height)
+        super().__init__(diameter, height, mass)
         self.mass = mass
         self.calc_I()
         self.calc_CG()
@@ -51,7 +61,7 @@ class tank(cylinder):
         self.calc_I()
         self.calc_CG()
 
-class cone:
+class cone(part):
     I = None
     CG = None
     def __init__(self, mass: float, diameter: float, height: float):
@@ -76,10 +86,11 @@ class cone:
     def calc_CG(self):
         self.CG = np.array([0, 0, self.height/4])        
         
-class fin:
+class fin(part):
     CG = None
     I = None
     def __init__(self, mass: float, height: float, mean_chord: float, taper: float):
+        super().__init__(0, height, mass)
         """return a new fin object
 
         Args:
@@ -88,17 +99,20 @@ class fin:
             mean_chord (float): mean chord of the fin
             taper (float): ratio between the tip chord and the root chord
         """
-        self.mass = mass
-        self.height = height
         self.mean_chord = mean_chord
-        self.taper = taper
+        self.taper = taper 
+        self.root_chord = 2*self.mean_chord/(1+self.taper)
+        self.tip_chord = self.root_chord*self.taper
+        self.area = mean_chord*height
+        
         self.calc_I()
         self.calc_CG()
 
     def calc_I(self):
         pass
+
     def calc_CG(self):
-        pass
+        ...
     
 class engine(cylinder):
     throttle = 0
@@ -122,10 +136,11 @@ class engine(cylinder):
         self.throttle = new_throttle        
         self.thrust = self.throttle * self.max_thrust
         
-class structural_rocket:
+class structural_rocket(part):
     
-    root = {}
+    root = None
     I = np.array([0, 0, 0])
+    CT = np.zeros(3) # center of thrust
     
     def __init__(self, root_part: cylinder):
         """retunr a new structural_rocket object
@@ -139,15 +154,10 @@ class structural_rocket:
         """
         """ fin position: relative to the cylinder, if n>1, the position is axysimetric of the cylinder"""    
         self.root = root_part
-    def add_part(self, part, offset, n=2):
-        if type(part) == fin and n>=2:
-            d_theta = 2*np.pi/n
-            start_theta = np.arctan2(offset[1], offset[0])
-            for i in range(n): #FIXME: check how to add multiple identical fin with different offset
-                r = R_matrix(start_theta+i*d_theta)
-                self.root.add_child(part, r.dot(offset))
-        else:
-            self.root.add_child(part, offset)
+        self.CG = root_part.CG.copy()
+        self.mass = root_part.mass
+        self.add_child(root_part, np.array([0, 0, 0]))
+        self.CG = root_part.CG.copy()
 
     def get_dry_mass(self):
         pass
@@ -170,22 +180,18 @@ if __name__ == "__main__":
     c2 = cone(2/3, 2, 2)
     t1 = tank(1, 1, 2, 1)
     e1 = engine(0.8, 1, 0.5, 100)
-    f1 = fin(0.2, 1, 1, 0.5)
-    n_fins = 4
     # rocket parts tree
     rocket_parts_tree = {
-        c1:{
+        
             e1:np.array([0, 0, 0]),
+            c1:np.array([0, 0, 0]),
             t1:np.array([0, 0, e1.height]),
             c2:np.array([0, 0, c1.height]),
-            f1: (n_fins,np.array([c1.diameter/2, 0, 0])) 
-        }
     }
     # rocket assembly
     rocket = structural_rocket(c1)
-    rocket.add_part(e1, rocket_parts_tree[c1][e1])
-    rocket.add_part(t1, rocket_parts_tree[c1][t1])
-    rocket.add_part(c2, rocket_parts_tree[c1][c2])
-    rocket.add_part(f1, rocket_parts_tree[c1][f1][1], rocket_parts_tree[c1][f1][0])
-    
-    print(rocket.root.children)
+    rocket.add_child(e1, rocket_parts_tree[e1])
+    rocket.add_child(t1, rocket_parts_tree[t1])
+    rocket.add_child(c2, rocket_parts_tree[c2])
+        
+    print(rocket.CG)
