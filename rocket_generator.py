@@ -1,6 +1,18 @@
 import numpy as np
 
-class cylinder:
+R_matrix = lambda theta: np.array([[np.cos(theta), -np.sin(theta), 1], [np.sin(theta), np.cos(theta), 1]])
+
+class part:
+    versori = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    children = {}
+    def __init__(self, diameter: float, height: float):
+        self.diameter = diameter
+        self.height = height
+
+    def add_child(self, child, offset):
+        self.children[child] = offset
+
+class cylinder(part):
     I = None
     def __init__(self, mass: float, diameter:float, height:float):
         """retunr a new cylinder object
@@ -10,9 +22,8 @@ class cylinder:
             diameter (float): diameter of the cylinder
             height (float): height of the cylinder
         """
+        super().__init__(diameter, height)
         self.mass = mass
-        self.diameter = diameter
-        self.height = height
         self.calc_I()
         self.calc_CG()
         
@@ -90,6 +101,7 @@ class fin:
         pass
     
 class engine(cylinder):
+    throttle = 0
     def __init__(self, mass: float, diameter: float, height: float, max_thrust: float):
         """return a new engine object
 
@@ -102,56 +114,78 @@ class engine(cylinder):
         """
         super().__init__(mass, diameter, height)
         self.max_thrust = max_thrust
+        self.thrust = self.max_thrust * self.throttle
         self.calc_I()
         self.calc_CG()
-
-class struct_rocket:
-    """ fin position: relative to the cylinder, if n>1, the position is axysimetric of the cylinder"""
-    tank_pos_rel_cylinder =np.array([0, 0, 0])
-    cone_pos_rel_cylinder = np.array([0, 0, 0])
-    fin_pos_rel_cylinder = np.array([0, 0, 0])
-    n_fins = 0
-
+        
+    def set_throttle(self, new_throttle):
+        self.throttle = new_throttle        
+        self.thrust = self.throttle * self.max_thrust
+        
+class structural_rocket:
+    
+    root = {}
     I = np.array([0, 0, 0])
     
-    def __init__(self, n_fins: int, *parts):
-        """retunr a new struct_rocket object
+    def __init__(self, root_part: cylinder):
+        """retunr a new structural_rocket object
 
             the origin of the rocket is at the bottom of the cylinder in the center of the base and with the positive z axis pointing up
 
         Args:
             n_fin (int): number of fins
-            **parts: dict of rocket parts, must be in order from bottom to top
-             exaple: struct_rocket(engine, cylinder, fin, tank, cone)
+            *parts: list of rocket parts, must be in order from bottom to top and be paired in a tuple with the offset from origin 
+            exaple: structural_rocket(engine, cylinder, fin, tank, cone)
         """
-        self.n_fins = n_fins
-        self.parts = parts
-        self.tank_pos_rel = np.array([0, 0, self.parts[3].height/2])  # distance between the tank CG and the bottom of the cylinder
-        self.fin_pos_rel_cylinder = np.array([0, 0, 0])  # distance between the fin CG and the bottom of the cylinder
-        self.cone_pos_rel_cylinder = np.array([0, 0, 0]) # distance between the cone CG and the bottom of the cylinder
-        self.calc_I()
+        """ fin position: relative to the cylinder, if n>1, the position is axysimetric of the cylinder"""    
+        self.root = root_part
+    def add_part(self, part, offset, n=2):
+        if type(part) == fin and n>=2:
+            d_theta = 2*np.pi/n
+            start_theta = np.arctan2(offset[1], offset[0])
+            for i in range(n): #FIXME: check how to add multiple identical fin with different offset
+                r = R_matrix(start_theta+i*d_theta)
+                self.root.add_child(part, r.dot(offset))
+        else:
+            self.root.add_child(part, offset)
+
     def get_dry_mass(self):
         pass
+    
     def get_wet_mass(self):
         pass
+    
     def get_GC(self):
         pass
+    
     def get_Ct(self):
         pass
+    
     def calc_I(self):
-        pass    
-            
+        pass            
 
 if __name__ == "__main__":
-    c1 = cylinder(3, 1, 3)
-    c2 = cone(2/3, 1, 2)
+    # base parts of the rocket
+    c1 = cylinder(3, 2, 3)
+    c2 = cone(2/3, 2, 2)
     t1 = tank(1, 1, 2, 1)
     e1 = engine(0.8, 1, 0.5, 100)
     f1 = fin(0.2, 1, 1, 0.5)
+    n_fins = 4
+    # rocket parts tree
+    rocket_parts_tree = {
+        c1:{
+            e1:np.array([0, 0, 0]),
+            t1:np.array([0, 0, e1.height]),
+            c2:np.array([0, 0, c1.height]),
+            f1: (n_fins,np.array([c1.diameter/2, 0, 0])) 
+        }
+    }
+    # rocket assembly
+    rocket = structural_rocket(c1)
+    rocket.add_part(e1, rocket_parts_tree[c1][e1])
+    rocket.add_part(t1, rocket_parts_tree[c1][t1])
+    rocket.add_part(c2, rocket_parts_tree[c1][c2])
+    rocket.add_part(f1, rocket_parts_tree[c1][f1][1], rocket_parts_tree[c1][f1][0])
     
-    print(c1.CG)
-    print(c2.CG)
-    print(t1.CG)
-    print(e1.CG)
-    print(f1.CG)
-    rocket = struct_rocket(3, e1, c1, f1, t1, c2)
+    print(rocket.root.children)
