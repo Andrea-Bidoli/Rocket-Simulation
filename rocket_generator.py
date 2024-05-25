@@ -7,10 +7,10 @@ class part:
     versori = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     children = {}
     
-    def __init__(self, diameter: float, height: float, mass: float):
+    def __init__(self, diameter: float, height: float, mass: float|None =None):
         self.diameter = diameter
         self.height = height
-        self.mass = mass
+        self.mass = mass if mass is not None else diameter*height
         self.CG = np.array([0, 0, height/2])
         
     def add_child(self, child, offset):
@@ -24,7 +24,8 @@ class part:
         
 class cylinder(part):
     I = None
-    def __init__(self, mass: float, diameter:float, height:float):
+    def __init__(self, diameter: float, height: float, mass: float | None = None):
+        super().__init__(diameter, height, mass)
         """retunr a new cylinder object
 
         Args:
@@ -32,8 +33,6 @@ class cylinder(part):
             diameter (float): diameter of the cylinder
             height (float): height of the cylinder
         """
-        super().__init__(diameter, height, mass)
-        self.mass = mass
         self.calc_I()
         self.calc_CG()
         
@@ -46,7 +45,8 @@ class cylinder(part):
         self.CG = np.array([0, 0, self.height/2])
 
 class tank(cylinder):
-    def __init__(self, mass: float, diameter: float, height:float, fuel_mass: float):
+    def __init__(self, diameter: float, height: float, fuel_mass:float,  mass: float | None = None):
+        super().__init__(diameter, height, mass)
         """return a new tank object
 
         Args:
@@ -55,7 +55,6 @@ class tank(cylinder):
             height (float): height of the tank
             fuel_mass (float): mass of the fuel
         """
-        super().__init__(mass, diameter, height)
         self.fuel_mass = fuel_mass
         self.mass += self.fuel_mass
         self.calc_I()
@@ -64,7 +63,8 @@ class tank(cylinder):
 class cone(part):
     I = None
     CG = None
-    def __init__(self, mass: float, diameter: float, height: float):
+    def __init__(self, diameter: float, height: float, mass: float | None = None):
+        super().__init__(diameter, height, mass)
         """return a new cone object
 
         Args:
@@ -72,9 +72,6 @@ class cone(part):
             diameter (float): diameter of the cone
             height (float): height of the cone
         """
-        self.mass = mass
-        self.diameter = diameter
-        self.height = height
         self.calc_I()
         self.calc_CG()
         
@@ -89,8 +86,8 @@ class cone(part):
 class fin(part):
     CG = None
     I = None
-    def __init__(self, mass: float, height: float, mean_chord: float, taper: float):
-        super().__init__(0, height, mass)
+    def __init__(self, mean_chord: float, height: float, taper:float, mass: float | None = None):
+        super().__init__(mean_chord, height, mass)
         """return a new fin object
 
         Args:
@@ -99,12 +96,11 @@ class fin(part):
             mean_chord (float): mean chord of the fin
             taper (float): ratio between the tip chord and the root chord
         """
-        self.mean_chord = mean_chord
+        self.mean_chord = self.diameter
         self.taper = taper 
         self.root_chord = 2*self.mean_chord/(1+self.taper)
         self.tip_chord = self.root_chord*self.taper
-        self.area = mean_chord*height
-        
+        self.area = self.mean_chord*height
         self.calc_I()
         self.calc_CG()
 
@@ -112,7 +108,9 @@ class fin(part):
         pass
 
     def calc_CG(self):
-        ...
+        xg = (self.tip_chord**2 + self.root_chord**2 + self.tip_chord*self.root_chord)/(3*(self.tip_chord+self.root_chord))
+        yg = self.height*(2*self.tip_chord+self.root_chord)/(3*(self.tip_chord+self.root_chord))
+        self.CG = np.array([xg, 0, yg])
     
 class engine(cylinder):
     throttle = 0
@@ -139,7 +137,7 @@ class engine(cylinder):
 class structural_rocket(part):
     
     root = None
-    I = np.array([0, 0, 0])
+    I = np.zeros(3) # inertia tensor
     CT = np.zeros(3) # center of thrust
     
     def __init__(self, root_part: cylinder):
@@ -159,30 +157,26 @@ class structural_rocket(part):
         self.add_child(root_part, np.array([0, 0, 0]))
         self.CG = root_part.CG.copy()
 
-    def get_dry_mass(self):
-        pass
-    
-    def get_wet_mass(self):
-        pass
-    
-    def get_GC(self):
-        pass
-    
+    def calc_mass(self):
+        for part in self.children:
+            self.mass += part.mass
+
     def get_Ct(self):
-        pass
+        for part in self.children:
+            if type(part) == engine:
+                self.CT += part.CG
     
     def calc_I(self):
         pass            
 
 if __name__ == "__main__":
     # base parts of the rocket
-    c1 = cylinder(3, 2, 3)
-    c2 = cone(2/3, 2, 2)
+    c1 = cylinder(1, 2, 3)
+    c2 = cone(1, 2, 2)
     t1 = tank(1, 1, 2, 1)
-    e1 = engine(0.8, 1, 0.5, 100)
+    e1 = engine(1, 1, 0.5, 100)
     # rocket parts tree
     rocket_parts_tree = {
-        
             e1:np.array([0, 0, 0]),
             c1:np.array([0, 0, 0]),
             t1:np.array([0, 0, e1.height]),
