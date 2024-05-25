@@ -114,7 +114,8 @@ class fin(part):
     
 class engine(cylinder):
     throttle = 0
-    def __init__(self, mass: float, diameter: float, height: float, max_thrust: float):
+    def __init__(self, diameter: float, height: float, max_thrust: float, mass: float | None = None):
+        super().__init__(diameter, height, mass)
         """return a new engine object
 
         Args:
@@ -124,11 +125,11 @@ class engine(cylinder):
             fuel_mass (float): mass of the fuel
             thrust (float): thrust of the engine
         """
-        super().__init__(mass, diameter, height)
+
         self.max_thrust = max_thrust
         self.thrust = self.max_thrust * self.throttle
-        self.calc_I()
         self.calc_CG()
+        self.calc_I()
         
     def set_throttle(self, new_throttle):
         self.throttle = new_throttle        
@@ -156,6 +157,7 @@ class structural_rocket(part):
         self.mass = root_part.mass
         self.add_child(root_part, np.array([0, 0, 0]))
         self.CG = root_part.CG.copy()
+        self.I = root_part.I.copy()
 
     def calc_mass(self):
         for part in self.children:
@@ -167,13 +169,15 @@ class structural_rocket(part):
                 self.CT += part.CG
     
     def calc_I(self):
-        pass            
+        for part in self.children:
+            dist = np.linalg.norm(part.CG-self.CG)
+            self.I = self.I+part.I+part.mass*dist**2
 
 if __name__ == "__main__":
     # base parts of the rocket
-    c1 = cylinder(1, 2, 3)
-    c2 = cone(1, 2, 2)
-    t1 = tank(1, 1, 2, 1)
+    c1 = cylinder(1, 2)
+    c2 = cone(1, 2)
+    t1 = tank(1, 1, 2)
     e1 = engine(1, 1, 0.5, 100)
     # rocket parts tree
     rocket_parts_tree = {
@@ -187,5 +191,5 @@ if __name__ == "__main__":
     rocket.add_child(e1, rocket_parts_tree[e1])
     rocket.add_child(t1, rocket_parts_tree[t1])
     rocket.add_child(c2, rocket_parts_tree[c2])
-        
-    print(rocket.CG)
+    rocket.calc_I()
+    print(f"CG: {rocket.CG}\nI: {rocket.I}\nCT: {rocket.CT}")

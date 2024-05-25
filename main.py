@@ -1,7 +1,6 @@
 import numpy as np
 import rocket_generator as rg
 
-
 g = np.array([0, 0, -9.81])
 
 class Rocket:
@@ -21,16 +20,12 @@ class Rocket:
     velocity = np.array([0, 0, 0])
     acceleration = np.array([0, 0, 0])
     
-    def __init__(self, struct_rocket: rg.struct_rocket, throttle=1, pitch=0, roll=0, yaw=0):
+    def __init__(self, struct_rocket: rg.struct_rocket, throttle=1, t_pitch=0, t_roll=0, t_yaw=0):
         self.struct_rocket = struct_rocket
-        # rocket axis
-        self.pitch = pitch
-        self.roll = roll
-        self.yaw = yaw
         # engine axis_rel_rocket
-        self.thrust_pitch = 0
-        self.thrust_roll = 0
-        self.thrust_yaw = 0
+        self.thrust_pitch = t_pitch
+        self.thrust_roll = t_roll
+        self.thrust_yaw = t_yaw
         self.throttle = throttle
     
     def update_velocity(self):
