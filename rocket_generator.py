@@ -1,5 +1,4 @@
 import numpy as np
-from copy import deepcopy
 
 R_matrix = lambda theta: np.array([[np.cos(theta), -np.sin(theta), 1], [np.sin(theta), np.cos(theta), 1]])
 
@@ -114,7 +113,13 @@ class fin(part):
     
 class engine(cylinder):
     throttle = 0
-    def __init__(self, diameter: float, height: float, max_thrust: float, mass: float | None = None):
+    engine_angles = np.zeros(2)
+    max_angle = np.deg2rad(30)
+    thrust = np.zeros(3)
+    e_pitch_perc=0
+    e_yaw_perc=0
+    
+    def __init__(self, diameter: float, height: float, flow: float, max_thrust: float, mass: float | None = None):
         super().__init__(diameter, height, mass)
         """return a new engine object
 
@@ -125,15 +130,31 @@ class engine(cylinder):
             fuel_mass (float): mass of the fuel
             thrust (float): thrust of the engine
         """
-
         self.max_thrust = max_thrust
-        self.thrust = self.max_thrust * self.throttle
+        self.flow = flow
         self.calc_CG()
         self.calc_I()
         
     def set_throttle(self, new_throttle):
         self.throttle = new_throttle        
-        self.thrust = self.throttle * self.max_thrust
+        self.calc_thrust()
+    
+    def set_pitch(self, pitch):
+        if -100>pitch>100:
+            raise ValueError("pitch must be between -100 and 100 or -1 and 1")
+        self.e_pitch_perc = pitch/100 if pitch>1 or pitch<-1 else pitch
+    
+    def set_yaw(self, yaw):
+        if -100>yaw>100:
+            raise ValueError("yaw must be between -100 and 100 or -1 and 1")
+        self.e_yaw_perc = yaw/100 if yaw>1 or yaw<-1 else yaw
+    
+    def calc_thrust(self):
+        pitch_angle = self.max_angle*self.e_pitch_perc
+        yaw_angle = self.max_angle*self.e_yaw_perc
+        self.thrust[0] = self.throttle*self.max_thrust*np.sin(pitch_angle)
+        self.thrust[1] = self.throttle*self.max_thrust*np.sin(yaw_angle)
+        self.thrust[2] = self.throttle*self.max_thrust*np.cos(pitch_angle)*np.cos(yaw_angle)
         
 class structural_rocket(part):
     
@@ -187,9 +208,8 @@ if __name__ == "__main__":
             c2:np.array([0, 0, c1.height]),
     }
     # rocket assembly
-    rocket = structural_rocket(c1)
-    rocket.add_child(e1, rocket_parts_tree[e1])
-    rocket.add_child(t1, rocket_parts_tree[t1])
-    rocket.add_child(c2, rocket_parts_tree[c2])
-    rocket.calc_I()
-    print(f"CG: {rocket.CG}\nI: {rocket.I}\nCT: {rocket.CT}")
+    e1.set_throttle(1)
+    e1.set_pitch(10)
+    e1.set_yaw(0)
+    e1.calc_thrust()
+    print(f"thrust: {e1.thrust} |thrust: {np.linalg.norm(e1.thrust)}|")

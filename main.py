@@ -3,29 +3,21 @@ import rocket_generator as rg
 
 g = np.array([0, 0, -9.81])
 
-class Rocket:
+class Computer:
     struct_rocket = None
     
-    pitch = 0
-    roll = 0
-    yaw = 0
-    
-    thrust_pitch = 0
-    thrust_roll = 0
-    thrust_yaw = 0
-    
-    throttle = 0
-    
+    angles = np.array([0, 0, 0])
     position = np.array([0, 0, 0])
     velocity = np.array([0, 0, 0])
     acceleration = np.array([0, 0, 0])
     
-    def __init__(self, struct_rocket: rg.struct_rocket, throttle=1, t_pitch=0, t_roll=0, t_yaw=0):
+    thrust = np.array([0, 0, 0])
+    
+    def __init__(self, struct_rocket: rg.struct_rocket, throttle=1, t_pitch=0, t_yaw=0):
         self.struct_rocket = struct_rocket
         # engine axis_rel_rocket
-        self.thrust_pitch = t_pitch
-        self.thrust_roll = t_roll
-        self.thrust_yaw = t_yaw
+        self.engine_angles[0] = t_pitch
+        self.engine_angles[1] = t_yaw
         self.throttle = throttle
     
     def update_velocity(self):
@@ -44,3 +36,8 @@ class Rocket:
     def update_mass(self):
         self.mass -= self.fuel_burn_rate
     
+    def update_thrust(self):
+        for part in self.struct_rocket.parts:
+            if isinstance(part, rg.engine):
+                part.set_throttle(self.throttle)
+                
