@@ -113,8 +113,7 @@ class fin(part):
     
 class engine(cylinder):
     throttle = 0
-    engine_angles = np.zeros(2)
-    max_angle = np.deg2rad(30)
+    max_angle = np.deg2rad(15)
     thrust = np.zeros(3)
     e_pitch_perc=0
     e_yaw_perc=0
@@ -150,12 +149,13 @@ class engine(cylinder):
         self.e_yaw_perc = yaw/100 if yaw>1 or yaw<-1 else yaw
     
     def calc_thrust(self):
-        pitch_angle = self.max_angle*self.e_pitch_perc
-        yaw_angle = self.max_angle*self.e_yaw_perc
-        self.thrust[0] = self.throttle*self.max_thrust*np.sin(pitch_angle)
-        self.thrust[1] = self.throttle*self.max_thrust*np.sin(yaw_angle)
-        self.thrust[2] = self.throttle*self.max_thrust*np.cos(pitch_angle)*np.cos(yaw_angle)
+        theta = np.arctan2(self.e_pitch_perc, self.e_yaw_perc)
+        phi = np.sqrt(self.e_pitch_perc**2 + self.e_yaw_perc**2)*self.max_angle
         
+        self.thrust[0] = self.throttle*self.max_thrust*np.sin(phi)*np.cos(theta)
+        self.thrust[1] = self.throttle*self.max_thrust*np.sin(phi)*np.sin(theta)
+        self.thrust[2] = -self.throttle*self.max_thrust*np.cos(phi)
+    
 class structural_rocket(part):
     
     root = None
@@ -209,7 +209,6 @@ if __name__ == "__main__":
     }
     # rocket assembly
     e1.set_throttle(1)
-    e1.set_pitch(10)
+    e1.set_pitch(50)
     e1.set_yaw(0)
     e1.calc_thrust()
-    print(f"thrust: {e1.thrust} |thrust: {np.linalg.norm(e1.thrust)}|")
