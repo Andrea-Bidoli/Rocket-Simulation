@@ -4,22 +4,23 @@ R_matrix = lambda theta: np.array([[np.cos(theta), -np.sin(theta), 1], [np.sin(t
 
 class part:
     versori = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-    children = {}
-    
-    def __init__(self, diameter: float, height: float, mass: float|None =None):
-        self.diameter = diameter
+    O = np.array([0, 0, 0])
+    def __init__(self, base: float, height: float, mass: float|None =None):
+        self.base = base
         self.height = height
-        self.mass = mass if mass is not None else diameter*height
+        self.mass = mass if mass is not None else base*height
         self.CG = np.array([0, 0, height/2])
         
-    def add_child(self, child, offset):
-        self.children[child] = offset
-        self.calc_child_CG()
+    def add_child(self, child, offset: np.array|list|tuple = (0, 0, 0)):
+        if isinstance(offset, (list, tuple)):
+            offset = np.array(offset)
+        child.O = self.O + offset
+        self.calc_CG(child)
 
-    def calc_child_CG(self):
-        for cpart in self.children:
-            self.CG = (self.CG*self.mass + (cpart.CG+self.children[cpart])*cpart.mass)/ (self.mass + cpart.mass)
-            self.mass += cpart.mass
+    def calc_CG(self, cpart:'part'):
+        # TODO: check if CG is calculated correctly
+        self.CG = (self.CG*self.mass + cpart.O+cpart.CG)*cpart.mass / (self.mass + cpart.mass)
+        self.mass += cpart.mass
         
 class cylinder(part):
     I = None
@@ -156,29 +157,12 @@ class engine(cylinder):
         self.thrust[1] = self.throttle*self.max_thrust*np.sin(phi)*np.sin(theta)
         self.thrust[2] = -self.throttle*self.max_thrust*np.cos(phi)
     
-class structural_rocket(part):
+class rocket(part):
     
-    root = None
-    I = np.zeros(3) # inertia tensor
+    I = np.zeros(3) # inertia vector
     CT = np.zeros(3) # center of thrust
-    
-    def __init__(self, root_part: cylinder):
-        """retunr a new structural_rocket object
-
-            the origin of the rocket is at the bottom of the cylinder in the center of the base and with the positive z axis pointing up
-
-        Args:
-            n_fin (int): number of fins
-            *parts: list of rocket parts, must be in order from bottom to top and be paired in a tuple with the offset from origin 
-            exaple: structural_rocket(engine, cylinder, fin, tank, cone)
-        """
-        """ fin position: relative to the cylinder, if n>1, the position is axysimetric of the cylinder"""    
-        self.root = root_part
-        self.CG = root_part.CG.copy()
-        self.mass = root_part.mass
-        self.add_child(root_part, np.array([0, 0, 0]))
-        self.CG = root_part.CG.copy()
-        self.I = root_part.I.copy()
+    def __init__(self):
+        super().__init__(0, 0, 0)
 
     def calc_mass(self):
         for part in self.children:
@@ -186,7 +170,7 @@ class structural_rocket(part):
 
     def get_Ct(self):
         for part in self.children:
-            if type(part) == engine:
+            if isinstance(part, engine):
                 self.CT += part.CG
     
     def calc_I(self):
@@ -200,6 +184,7 @@ if __name__ == "__main__":
     c2 = cone(1, 2)
     t1 = tank(1, 1, 2)
     e1 = engine(1, 1, 0.5, 100)
+    f1 = fin
     # rocket parts tree
     rocket_parts_tree = {
             e1:np.array([0, 0, 0]),
@@ -208,7 +193,14 @@ if __name__ == "__main__":
             c2:np.array([0, 0, c1.height]),
     }
     # rocket assembly
-    e1.set_throttle(1)
-    e1.set_pitch(50)
-    e1.set_yaw(0)
-    e1.calc_thrust()
+    R1 = rocket()
+    R1.add_child(c1, (0, 0, 0))
+    R1.add_child(c2, (0, 0, c1.height))
+    R1.add_child(e1, (0, 0, 0))
+    R1.add_child(t1, (0, 0, e1.height))
+    for i in np.linspace(0, 2*np.pi, 3):
+        ax, ay = np.cos(i), np.sin(i)
+        R_matrix(i)
+        R1.add_child(f1(1, 1, 0.5), (c1.diameter/2, 0, 0))
+        R1.add_child(f1(1, 1, 0.5), (c1.diameter/2, 0, 0))
+        R1.add_child(f1(1, 1, 0.5), (c1.diameter/2, 0, 0))
