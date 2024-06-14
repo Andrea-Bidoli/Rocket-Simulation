@@ -1,5 +1,6 @@
 import numpy as np
 
+# 2D matrix rotation
 R_matrix = lambda theta: np.array([[np.cos(theta), -np.sin(theta), 1], [np.sin(theta), np.cos(theta), 1]])
 
 class part:
@@ -18,8 +19,10 @@ class part:
         self.calc_CG(child)
 
     def calc_CG(self, cpart:'part'):
-        # TODO: check if CG is calculated correctly
-        self.CG = (self.CG*self.mass + cpart.O+cpart.CG)*cpart.mass / (self.mass + cpart.mass)
+        """
+            must run on the root part
+        """
+        self.CG = ((self.CG*self.mass) + (cpart.O+cpart.CG*cpart.mass)) / (self.mass + cpart.mass)
         self.mass += cpart.mass
         
 class cylinder(part):
@@ -158,20 +161,30 @@ class engine(cylinder):
         self.thrust[2] = -self.throttle*self.max_thrust*np.cos(phi)
     
 class rocket(part):
-    
     I = np.zeros(3) # inertia vector
     CT = np.zeros(3) # center of thrust
+    fuel_mass = 0
+    
     def __init__(self):
         super().__init__(0, 0, 0)
 
     def calc_mass(self):
         for part in self.children:
+            if isinstance(part, tank):
+                self.fuel_mass += part.fuel_mass
+            if isinstance(part, engine):
+                self.engine_flow += part.flow
             self.mass += part.mass
 
     def get_Ct(self):
         for part in self.children:
             if isinstance(part, engine):
                 self.CT += part.CG
+    
+    def get_Cl(self):
+        for part in self.children:
+            if isinstance(part, fin):
+                self.CL += part.CG*part.area
     
     def calc_I(self):
         for part in self.children:
